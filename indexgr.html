@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ID Card Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #ddd;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background: #fff;
+            border-bottom: 1px solid #fff;
+        }
+        .tab-content {
+            display: none;
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 0 5px 5px 5px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .id-card {
+            width: 320px;
+            height: 200px;
+            border: 1px solid #000;
+            padding: 10px;
+            margin: 10px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+            font-size: 12px;
+        }
+        .id-card.badge {
+            width: 200px;
+            height: 125px;
+            font-size: 10px;
+        }
+        .id-card.custom {
+            width: 400px;
+            height: 250px;
+        }
+        .id-card img.photo {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .id-card img.logo {
+            width: 60px;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+        .id-card .qr {
+            width: 60px;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+        }
+        .id-card .details {
+            margin: 10px 0 0 80px;
+        }
+        .id-card .footer {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 10px;
+        }
+        .print-preview {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        @media print {
+            body {
+                background: none;
+            }
+            .container {
+                display: none;
+            }
+            .print-preview {
+                display: flex !important;
+                flex-wrap: wrap;
+            }
+            .id-card {
+                box-shadow: none;
+                margin: 5mm;
+            }
+            @page {
+                size: A4;
+                margin: 10mm;
+            }
+        }
+        button {
+            padding: 10px 15px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ID Card Generator</h1>
+        <div class="tabs">
+            <div class="tab active" data-tab="add">Add Person</div>
+            <div class="tab" data-tab="preview">Print Preview</div>
+            <div class="tab" data-tab="settings">Settings</div>
+        </div>
+        <div class="tab-content active" id="add">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label>Role/Position</label>
+                <input type="text" id="role" required>
+            </div>
+            <div class="form-group">
+                <label>Department (Optional)</label>
+                <input type="text" id="department">
+            </div>
+            <div class="form-group">
+                <label>ID Number</label>
+                <input type="text" id="idNumber" placeholder="Leave blank for auto">
+            </div>
+            <div class="form-group">
+                <label>Photo</label>
+                <input type="file" id="photo" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>QR Code Text (Optional)</label>
+                <input type="text" id="qrText" placeholder="Enter text or ID">
+            </div>
+            <button onclick="addPerson()">Add Person</button>
+            <button onclick="saveData()">Export Data (.json)</button>
+            <div class="form-group">
+                <label>Import Data</label>
+                <input type="file" id="importData" accept=".json">
+            </div>
+        </div>
+        <div class="tab-content" id="preview">
+            <button onclick="window.print()">Print / Export to PDF</button>
+            <div class="print-preview" id="printPreview"></div>
+        </div>
+        <div class="tab-content" id="settings">
+            <div class="form-group">
+                <label>Organization Name</label>
+                <input type="text" id="orgName" value="My Organization">
+            </div>
+            <div class="form-group">
+                <label>Address (Optional)</label>
+                <input type="text" id="address">
+            </div>
+            <div class="form-group">
+                <label>Footer Text</label>
+                <input type="text" id="footer" value="Valid Until: 12/31/2025">
+            </div>
+            <div class="form-group">
+                <label>Default Logo</label>
+                <input type="file" id="logo" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>ID Size</label>
+                <select id="idSize">
+                    <option value="card">Card (320x200px)</option>
+                    <option value="badge">Badge (200x125px)</option>
+                    <option value="custom">Custom (400x250px)</option>
+                </select>
+            </div>
+            <button onclick="saveSettings()">Save Settings</button>
+        </div>
+    </div>
+
+    <script>
+        // QR Code Generator (Simple Base64-like encoding for demo)
+        function generateQR(text) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 60;
+            canvas.height = 60;
+            const ctx = canvas.getContext('2d');
+            const size = 60;
+            const matrixSize = 10;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000';
+            for (let i = 0; i < matrixSize; i++) {
+                for (let j = 0; j < matrixSize; j++) {
+                    if (Math.random() > 0.5) {
+                        ctx.fillRect(i * (size / matrixSize), j * (size / matrixSize), size / matrixSize, size / matrixSize);
+                    }
+                }
+            }
+            return canvas.toDataURL();
+        }
+
+        let people = [];
+        let settings = {
+            orgName: 'My Organization',
+            address: '',
+            footer: 'Valid Until: 12/31/2025',
+            logo: null,
+            idSize: 'card'
+        };
+        let nextId = 1000;
+
+        // Load settings from localStorage
+        if (localStorage.getItem('idCardSettings')) {
+            settings = JSON.parse(localStorage.getItem('idCardSettings'));
+            document.getElementById('orgName').value = settings.orgName;
+            document.getElementById('address').value = settings.address || '';
+            document.getElementById('footer').value = settings.footer;
+            document.getElementById('idSize').value = settings.idSize;
+        }
+
+        function addPerson() {
+            const name = document.getElementById('name').value;
+            const role = document.getElementById('role').value;
+            const department = document.getElementById('department').value;
+            let idNumber = document.getElementById('idNumber').value;
+            const photo = document.getElementById('photo').files[0];
+            const qrText = document.getElementById('qrText').value;
+
+            if (!name || !role) {
+                alert('Name and Role are required');
+                return;
+            }
+
+            if (!idNumber) {
+                idNumber = 'ID' + nextId++;
+            }
+
+            const person = {
+                name,
+                role,
+                department,
+                idNumber,
+                photo: null,
+                qr: qrText ? generateQR(qrText || idNumber) : null
+            };
+
+            if (photo) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    person.photo = e.target.result;
+                    people.push(person);
+                    updatePreview();
+                    clearForm();
+                };
+                reader.readAsDataURL(photo);
+            } else {
+                people.push(person);
+                updatePreview();
+                clearForm();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('name').value = '';
+            document.getElementById('role').value = '';
+            document.getElementById('department').value = '';
+            document.getElementById('idNumber').value = '';
+            document.getElementById('photo').value = '';
+            document.getElementById('qrText').value = '';
+        }
+
+        function updatePreview() {
+            const preview = document.getElementById('printPreview');
+            preview.innerHTML = '';
+            people.forEach(person => {
+                const card = document.createElement('div');
+                card.className = `id-card ${settings.idSize}`;
+                card.innerHTML = `
+                    ${settings.logo ? `<img class="logo" src="${settings.logo}" alt="Logo">` : ''}
+                    ${person.photo ? `<img class="photo" src="${person.photo}" alt="Photo">` : ''}
+                    <div class="details">
+                        <strong>${settings.orgName}</strong><br>
+                        ${settings.address ? settings.address + '<br>' : ''}
+                        <br>
+                        <strong>Name:</strong> ${person.name}<br>
+                        <strong>Role:</strong> ${person.role}<br>
+                        ${person.department ? `<strong>Dept:</strong> ${person.department}<br>` : ''}
+                        <strong>ID:</strong> ${person.idNumber}
+                    </div>
+                    ${person.qr ? `<img class="qr" src="${person.qr}" alt="QR">` : ''}
+                    <div class="footer">${settings.footer}</div>
+                `;
+                preview.appendChild(card);
+            });
+        }
+
+        function saveSettings() {
+            settings.orgName = document.getElementById('orgName').value;
+            settings.address = document.getElementById('address').value;
+            settings.footer = document.getElementById('footer').value;
+            settings.idSize = document.getElementById('idSize').value;
+            const logo = document.getElementById('logo').files[0];
+            if (logo) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    settings.logo = e.target.result;
+                    localStorage.setItem('idCardSettings', JSON.stringify(settings));
+                    updatePreview();
+                };
+                reader.readAsDataURL(logo);
+            } else {
+                localStorage.setItem('idCardSettings', JSON.stringify(settings));
+                updatePreview();
+            }
+        }
+
+        function saveData() {
+            const data = JSON.stringify(people);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'id_cards.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('importData').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    people = JSON.parse(e.target.result);
+                    nextId = Math.max(...people.map(p => parseInt(p.idNumber.replace('ID', '')) || 0)) + 1 || 1000;
+                    updatePreview();
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Tab Switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Initial preview
+        updatePreview();
+    </script>
+</body>
+</html>

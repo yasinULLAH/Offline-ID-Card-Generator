@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline ID Card Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif; /* Using Inter font via Tailwind */
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Hide elements during printing */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .card-print-container {
+                page-break-inside: avoid; /* Try to keep cards from splitting across pages */
+                margin: 10px; /* Add some margin for printing */
+                box-shadow: none; /* Remove shadow for print */
+                border: 1px solid #ccc; /* Add a light border for cutting guides */
+                overflow: hidden; /* Ensure content doesn't overflow */
+            }
+            .id-card {
+                 transform: scale(1) !important; /* Ensure cards print at actual size */
+                 box-shadow: none !important;
+                 border: 1px solid #ddd; /* Optional border for print */
+                 margin: 0; /* Remove margin for print */
+            }
+            /* Adjust grid for printing - e.g., 2 columns for A4 portrait */
+             #print-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr); /* Adjust columns as needed */
+                gap: 10px;
+            }
+        }
+
+        /* Default ID Card Styles */
+        .id-card {
+            background-color: white;
+            border-radius: 0.5rem; /* Rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Keep content inside rounded corners */
+            position: relative;
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb; /* Light border */
+            font-family: sans-serif; /* Simple font for cards */
+        }
+
+        /* Size Classes */
+        .size-badge { width: 240px; height: 360px; } /* Small badge */
+        .size-card { width: 325px; height: 200px; } /* Credit card size ~3.375in x 2.125in */
+        /* Custom size will be set via inline style */
+
+        /* Tab Styles */
+        .tab-button {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s ease;
+            border: 1px solid transparent;
+        }
+        .tab-button.active {
+            background-color: white;
+            font-weight: 600;
+            border-color: #d1d5db; /* Gray border for active tab */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .tab-button:not(.active):hover {
+            background-color: #e5e7eb; /* Light gray hover */
+        }
+        .tab-content {
+            display: none;
+            padding: 1.5rem;
+            background-color: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0 0.375rem 0.375rem 0.375rem; /* Rounded corners except top-left */
+            margin-top: -1px; /* Overlap border */
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Simple QR Code Placeholder Style */
+        .qr-code-placeholder {
+            width: 60px;
+            height: 60px;
+            background-color: #e5e7eb;
+            border: 1px dashed #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            color: #6b7280;
+            text-align: center;
+            overflow: hidden;
+            word-break: break-all;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <h1 class="text-2xl md:text-3xl font-bold mb-6 text-center text-gray-800 no-print">Offline ID Card Generator</h1>
+
+    <div class="mb-6 max-w-6xl mx-auto no-print">
+        <div class="flex border-b border-gray-300">
+            <button class="tab-button active" onclick="openTab(event, 'entryTab')">Person Entry & Preview</button>
+            <button class="tab-button" onclick="openTab(event, 'batchTab')">Batch View & Print</button>
+            <button class="tab-button" onclick="openTab(event, 'settingsTab')">Settings</button>
+            <button class="tab-button" onclick="openTab(event, 'dataTab')">Data Management</button>
+        </div>
+
+        <div>
+            <div id="entryTab" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h2 class="text-xl font-semibold mb-4">Add New Person</h2>
+                        <form id="person-form" class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700">Full Name:</label>
+                                <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="role" class="block text-sm font-medium text-gray-700">Role/Position:</label>
+                                <input type="text" id="role" name="role" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="department" class="block text-sm font-medium text-gray-700">Department (Optional):</label>
+                                <input type="text" id="department" name="department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="idNumber" class="block text-sm font-medium text-gray-700">ID Number:</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" id="idNumber" name="idNumber" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <button type="button" id="autoIdBtn" class="mt-1 px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">Auto</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="photo" class="block text-sm font-medium text-gray-700">Photo:</label>
+                                <input type="file" id="photo" name="photo" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                <img id="photo-preview-form" src="https://placehold.co/100x100/e2e8f0/adb5bd?text=Photo" alt="Photo Preview" class="mt-2 h-20 w-20 object-cover rounded border border-gray-300">
+                            </div>
+                             <div>
+                                <label for="qrText" class="block text-sm font-medium text-gray-700">QR Code Text (Optional):</label>
+                                <input type="text" id="qrText" name="qrText" placeholder="e.g., Employee ID, URL" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" onclick="clearForm()" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">Clear Form</button>
+                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add Person</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h2 class="text-xl font-semibold mb-4">Live ID Card Preview</h2>
+                        <div class="flex justify-center items-start">
+                             <div id="live-preview-container" class="p-4 border border-dashed border-gray-300 rounded-lg flex justify-center items-center" style="min-height: 300px;">
+                                <div id="live-preview-card" class="id-card size-card">
+                                    </div>
+                            </div>
+                        </div>
+                         <div class="mt-4">
+                            <label for="cardSize" class="block text-sm font-medium text-gray-700 mb-1">Card Size:</label>
+                            <select id="cardSize" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <option value="badge">Badge (240x360px)</option>
+                                <option value="card" selected>Card (325x200px)</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            <div id="custom-size-inputs" class="hidden mt-2 space-y-2">
+                                <div class="flex items-center space-x-2">
+                                    <label for="customWidth" class="text-sm">Width (px):</label>
+                                    <input type="number" id="customWidth" value="325" class="block w-20 rounded-md border-gray-300 shadow-sm sm:text-sm">
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <label for="customHeight" class="text-sm">Height (px):</label>
+                                    <input type="number" id="customHeight" value="200" class="block w-20 rounded-md border-gray-300 shadow-sm sm:text-sm">
+                                </div>
+                                <button type="button" id="applyCustomSize" class="px-3 py-1 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-sm">Apply Custom</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="batchTab" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">Batch View & Print Preview</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-sm text-gray-600">Showing <span id="card-count">0</span> card(s).</p>
+                    <button onclick="printBatch()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm2 0h6v3H7V4zm7 6H6v6h8v-6zm-3 1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Print / Save as PDF</span>
+                    </button>
+                </div>
+                 <p class="text-xs text-gray-500 mb-4">Ensure your print settings (scale, margins, layout) are correct in the browser's print dialog. Select 'Save as PDF' as the destination to export.</p>
+                <div id="print-area"> <div id="print-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        </div>
+                </div>
+            </div>
+
+            <div id="settingsTab" class="tab-content">
+                <h2 class="text-xl font-semibold mb-4">Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="orgName" class="block text-sm font-medium text-gray-700">Organization Name:</label>
+                        <input type="text" id="orgName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                        <label for="orgAddress" class="block text-sm font-medium text-gray-700">Organization Address (Optional):</label>
+                        <input type="text" id="orgAddress" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                     <div>
+                        <label for="footerText" class="block text-sm font-medium text-gray-700">Footer Text (Optional):</label>
+                        <input type="text" id="footerText" placeholder="e.g., If found, please return to..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="logoUpload" class="block text-sm font-medium text-gray-700">Organization Logo:</label>
+                        <input type="file" id="logoUpload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        <img id="logo-preview-settings" src="https://placehold.co/100x50/e2e8f0/adb5bd?text=Logo" alt="Logo Preview" class="mt-2 h-12 object-contain border border-gray-300 rounded p-1">
+                    </div>
+                     <div class="flex justify-end">
+                         <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+
+             <div id="dataTab" class="tab-content">
+                 <h2 class="text-xl font-semibold mb-4">Data Management</h2>
+                 <div class="space-y-4">
+                     <div>
+                         <h3 class="text-lg font-medium text-gray-800">Export Data</h3>
+                         <p class="text-sm text-gray-600 mb-2">Save all current ID card entries to a JSON file.</p>
+                         <button onclick="exportData()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">Export to JSON</button>
+                     </div>
+                     <hr>
+                     <div>
+                         <h3 class="text-lg font-medium text-gray-800">Import Data</h3>
+                         <p class="text-sm text-gray-600 mb-2">Load ID card entries from a previously saved JSON file. This will replace current entries.</p>
+                         <label for="importFile" class="block text-sm font-medium text-gray-700">Select JSON File:</label>
+                         <input type="file" id="importFile" accept=".json" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                         <button onclick="importData()" class="mt-2 px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700">Import from JSON</button>
+                     </div>
+                     <hr>
+                      <div>
+                         <h3 class="text-lg font-medium text-gray-800 text-red-600">Clear All Data</h3>
+                         <p class="text-sm text-gray-600 mb-2">Permanently remove all entered ID card data from this session.</p>
+                         <button onclick="clearAllData()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Clear All Entries</button>
+                     </div>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Global Variables ---
+        let peopleData = []; // Array to hold data for each person
+        let settings = { // Object to hold settings
+            orgName: 'Your Organization',
+            orgAddress: '',
+            footerText: '',
+            logo: 'https://placehold.co/100x50/e2e8f0/adb5bd?text=Logo', // Default logo placeholder
+            cardSizeClass: 'size-card', // Default size class
+            customWidth: 325,
+            customHeight: 200
+        };
+        let nextId = 1; // For auto ID generation
+
+        // --- DOM Elements ---
+        const personForm = document.getElementById('person-form');
+        const nameInput = document.getElementById('name');
+        const roleInput = document.getElementById('role');
+        const departmentInput = document.getElementById('department');
+        const idNumberInput = document.getElementById('idNumber');
+        const photoInput = document.getElementById('photo');
+        const photoPreviewForm = document.getElementById('photo-preview-form');
+        const qrTextInput = document.getElementById('qrText');
+        const autoIdBtn = document.getElementById('autoIdBtn');
+
+        const livePreviewCard = document.getElementById('live-preview-card');
+        const printGrid = document.getElementById('print-grid');
+        const cardCountSpan = document.getElementById('card-count');
+
+        const orgNameInput = document.getElementById('orgName');
+        const orgAddressInput = document.getElementById('orgAddress');
+        const footerTextInput = document.getElementById('footerText');
+        const logoUploadInput = document.getElementById('logoUpload');
+        const logoPreviewSettings = document.getElementById('logo-preview-settings');
+
+        const cardSizeSelect = document.getElementById('cardSize');
+        const customSizeInputsDiv = document.getElementById('custom-size-inputs');
+        const customWidthInput = document.getElementById('customWidth');
+        const customHeightInput = document.getElementById('customHeight');
+        const applyCustomSizeBtn = document.getElementById('applyCustomSize');
+
+        const importFileInput = document.getElementById('importFile');
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings(); // Load settings from localStorage
+            updateLivePreview(); // Initial preview update
+            updateBatchView(); // Initial batch view update
+            setupEventListeners(); // Add event listeners
+            updateIdNumberPlaceholder(); // Set initial ID placeholder
+        });
+
+        // --- Event Listeners Setup ---
+        function setupEventListeners() {
+            personForm.addEventListener('submit', handleFormSubmit);
+            autoIdBtn.addEventListener('click', generateAutoId);
+            photoInput.addEventListener('change', handlePhotoPreview);
+            logoUploadInput.addEventListener('change', handleLogoPreview);
+
+            // Update live preview dynamically as user types
+            [nameInput, roleInput, departmentInput, idNumberInput, qrTextInput].forEach(input => {
+                input.addEventListener('input', updateLivePreview);
+            });
+
+            // Card size controls
+            cardSizeSelect.addEventListener('change', handleSizeChange);
+            applyCustomSizeBtn.addEventListener('click', handleApplyCustomSize);
+            customWidthInput.addEventListener('input', () => { if (settings.cardSizeClass === 'custom') updateLivePreview(); });
+            customHeightInput.addEventListener('input', () => { if (settings.cardSizeClass === 'custom') updateLivePreview(); });
+        }
+
+        // --- Tab Management ---
+        function openTab(event, tabId) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tc => tc.style.display = 'none');
+
+            // Deactivate all tab buttons
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(tb => tb.classList.remove('active'));
+
+            // Show the selected tab content
+            document.getElementById(tabId).style.display = 'block';
+
+            // Activate the clicked tab button
+            event.currentTarget.classList.add('active');
+
+            // Refresh batch view if switching to it
+            if (tabId === 'batchTab') {
+                updateBatchView();
+            }
+             // Refresh preview if switching to entry tab
+            if (tabId === 'entryTab') {
+                updateLivePreview();
+            }
+        }
+
+        // --- Settings Management ---
+        function saveSettings() {
+            settings.orgName = orgNameInput.value;
+            settings.orgAddress = orgAddressInput.value;
+            settings.footerText = footerTextInput.value;
+            // Logo is saved when selected via handleLogoPreview
+
+            localStorage.setItem('idCardGeneratorSettings', JSON.stringify(settings));
+            alert('Settings saved!');
+            updateLivePreview(); // Update preview with new settings
+            updateBatchView(); // Update batch view as well
+        }
+
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('idCardGeneratorSettings');
+            if (savedSettings) {
+                try {
+                    const parsedSettings = JSON.parse(savedSettings);
+                    // Merge saved settings with defaults to avoid issues if format changes
+                    settings = { ...settings, ...parsedSettings };
+                } catch (e) {
+                    console.error("Error loading settings:", e);
+                    // Use defaults if parsing fails
+                }
+            }
+
+            // Apply loaded settings to the UI
+            orgNameInput.value = settings.orgName;
+            orgAddressInput.value = settings.orgAddress;
+            footerTextInput.value = settings.footerText;
+            logoPreviewSettings.src = settings.logo; // Update settings preview
+            // Card size settings are applied via updateSizeControls() called from handleSizeChange/handleApplyCustomSize
+             updateSizeControls(); // Ensure size controls reflect loaded settings
+        }
+
+        function handleLogoPreview(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    settings.logo = e.target.result; // Store as base64
+                    logoPreviewSettings.src = settings.logo; // Update settings preview
+                    updateLivePreview(); // Update live preview immediately
+                    // Consider saving settings immediately or wait for explicit save button click
+                    // localStorage.setItem('idCardGeneratorSettings', JSON.stringify(settings)); // Optional: Save immediately
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // --- ID Card Generation & Rendering ---
+        function generateCardHTML(person) {
+            // Use settings for logo, org name etc.
+            const logoHTML = `<img src="${settings.logo}" alt="Org Logo" class="h-8 md:h-10 object-contain">`;
+            const orgNameHTML = `<h3 class="text-sm md:text-base font-bold text-gray-800">${settings.orgName}</h3>`;
+            const orgAddressHTML = settings.orgAddress ? `<p class="text-xs text-gray-500">${settings.orgAddress}</p>` : '';
+            const footerHTML = settings.footerText ? `<p class="text-[10px] text-gray-500 mt-auto pt-1">${settings.footerText}</p>` : '';
+
+            // Person details
+            const photoSrc = person.photoData || 'https://placehold.co/100x100/e2e8f0/adb5bd?text=Photo';
+            const photoHTML = `<img src="${photoSrc}" alt="${person.name}'s photo" class="w-16 h-16 md:w-20 md:h-20 object-cover rounded-full border-2 border-gray-300 shadow-sm">`;
+            const nameHTML = `<h2 class="text-base md:text-lg font-semibold mt-2 text-center text-gray-900">${person.name || 'Full Name'}</h2>`;
+            const roleHTML = `<p class="text-sm text-gray-700 text-center">${person.role || 'Role/Position'}</p>`;
+            const deptHTML = person.department ? `<p class="text-xs text-gray-500 text-center">Dept: ${person.department}</p>` : '';
+            const idHTML = `<p class="text-sm font-medium text-center mt-1">ID: ${person.idNumber || 'ID Number'}</p>`;
+
+            // QR Code Placeholder (displays text)
+            const qrCodeHTML = person.qrText ? `
+                <div class="mt-2 flex flex-col items-center">
+                    <div class="qr-code-placeholder p-1">${person.qrText}</div>
+                    <p class="text-[8px] text-gray-400 mt-0.5">Scan Info</p>
+                </div>
+                ` : '<div class="h-[70px]"></div>'; // Placeholder height if no QR
+
+            // Card Layout (Example - adjust flex/grid as needed for different looks)
+            // This is a basic vertical layout example
+            return `
+                <div class="flex flex-col h-full p-2 md:p-3">
+                    <div class="flex justify-between items-center border-b pb-1 mb-2">
+                        ${logoHTML}
+                        <div class="text-right">
+                            ${orgNameHTML}
+                            ${orgAddressHTML}
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center flex-grow">
+                        ${photoHTML}
+                        ${nameHTML}
+                        ${roleHTML}
+                        ${deptHTML}
+                        ${idHTML}
+                        ${qrCodeHTML}
+                    </div>
+                    <div class="border-t pt-1 mt-1 text-center">
+                         ${footerHTML}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateLivePreview() {
+            const currentData = {
+                name: nameInput.value,
+                role: roleInput.value,
+                department: departmentInput.value,
+                idNumber: idNumberInput.value,
+                photoData: photoPreviewForm.src.startsWith('data:image') ? photoPreviewForm.src : null, // Only use if it's a data URL
+                qrText: qrTextInput.value
+            };
+
+            // Apply size class / style
+            livePreviewCard.className = 'id-card'; // Reset classes
+            if (settings.cardSizeClass === 'custom') {
+                 livePreviewCard.style.width = `${settings.customWidth}px`;
+                 livePreviewCard.style.height = `${settings.customHeight}px`;
+            } else {
+                 livePreviewCard.classList.add(settings.cardSizeClass);
+                 livePreviewCard.style.width = ''; // Reset inline style
+                 livePreviewCard.style.height = '';
+            }
+
+            livePreviewCard.innerHTML = generateCardHTML(currentData);
+        }
+
+        function updateBatchView() {
+            printGrid.innerHTML = ''; // Clear existing cards
+            peopleData.forEach(person => {
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'card-print-container'; // Wrapper for print control
+
+                const cardElement = document.createElement('div');
+                cardElement.className = 'id-card'; // Base class
+
+                 // Apply size class / style
+                 if (settings.cardSizeClass === 'custom') {
+                     cardElement.style.width = `${settings.customWidth}px`;
+                     cardElement.style.height = `${settings.customHeight}px`;
+                 } else {
+                     cardElement.classList.add(settings.cardSizeClass);
+                 }
+
+                cardElement.innerHTML = generateCardHTML(person);
+                cardContainer.appendChild(cardElement);
+                printGrid.appendChild(cardContainer);
+            });
+            cardCountSpan.textContent = peopleData.length; // Update count
+        }
+
+        // --- Form Handling ---
+        function handleFormSubmit(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const person = {
+                id: Date.now(), // Simple unique ID for internal use
+                name: nameInput.value,
+                role: roleInput.value,
+                department: departmentInput.value,
+                idNumber: idNumberInput.value,
+                photoData: photoPreviewForm.src.startsWith('data:image') ? photoPreviewForm.src : null,
+                qrText: qrTextInput.value
+            };
+
+            peopleData.push(person);
+            updateBatchView(); // Update the grid view
+            clearForm(); // Clear form for next entry
+            updateIdNumberPlaceholder(); // Update potential next auto ID
+            alert(`${person.name} added successfully!`);
+        }
+
+        function clearForm() {
+            personForm.reset(); // Reset form fields
+            photoPreviewForm.src = 'https://placehold.co/100x100/e2e8f0/adb5bd?text=Photo'; // Reset photo preview
+            updateIdNumberPlaceholder(); // Reset ID field placeholder if needed
+            updateLivePreview(); // Clear live preview
+        }
+
+        function handlePhotoPreview(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    photoPreviewForm.src = e.target.result;
+                    updateLivePreview(); // Update preview when photo changes
+                }
+                reader.readAsDataURL(file);
+            } else {
+                 photoPreviewForm.src = 'https://placehold.co/100x100/e2e8f0/adb5bd?text=Photo'; // Reset if no file selected
+                 updateLivePreview();
+            }
+        }
+
+        function generateAutoId() {
+             // Basic check for existing IDs to avoid simple duplicates
+            let potentialId = nextId;
+            while (peopleData.some(p => p.idNumber === String(potentialId))) {
+                potentialId++;
+            }
+            nextId = potentialId; // Update nextId only if it wasn't already taken
+            idNumberInput.value = String(nextId);
+            nextId++; // Increment for the *next* auto ID
+            updateLivePreview(); // Update preview
+        }
+
+        function updateIdNumberPlaceholder() {
+            // Find the highest numerical ID used so far to suggest the next one
+            let maxId = 0;
+             peopleData.forEach(p => {
+                const numId = parseInt(p.idNumber, 10);
+                if (!isNaN(numId) && numId > maxId) {
+                    maxId = numId;
+                }
+            });
+            nextId = maxId + 1;
+            // Optionally set placeholder text:
+            // idNumberInput.placeholder = `Next auto ID: ${nextId}`;
+        }
+
+
+        // --- Card Size Management ---
+        function handleSizeChange() {
+            const selectedSize = cardSizeSelect.value;
+            if (selectedSize === 'custom') {
+                customSizeInputsDiv.classList.remove('hidden');
+                // Don't change size class yet, wait for apply button
+            } else {
+                customSizeInputsDiv.classList.add('hidden');
+                settings.cardSizeClass = `size-${selectedSize}`;
+                settings.customWidth = (selectedSize === 'badge') ? 240 : 325; // Update defaults for custom
+                settings.customHeight = (selectedSize === 'badge') ? 360 : 200;
+                customWidthInput.value = settings.customWidth;
+                customHeightInput.value = settings.customHeight;
+                applySizeUpdate();
+            }
+        }
+
+        function handleApplyCustomSize() {
+             settings.cardSizeClass = 'custom';
+             settings.customWidth = parseInt(customWidthInput.value, 10) || 325; // Use default if invalid
+             settings.customHeight = parseInt(customHeightInput.value, 10) || 200;
+             applySizeUpdate();
+        }
+
+        function applySizeUpdate() {
+             localStorage.setItem('idCardGeneratorSettings', JSON.stringify(settings)); // Save size changes
+             updateLivePreview();
+             updateBatchView(); // Update batch view with new size
+        }
+
+         function updateSizeControls() {
+            // Reflect loaded settings in the size controls
+            if (settings.cardSizeClass === 'custom') {
+                cardSizeSelect.value = 'custom';
+                customSizeInputsDiv.classList.remove('hidden');
+                customWidthInput.value = settings.customWidth;
+                customHeightInput.value = settings.customHeight;
+            } else {
+                customSizeInputsDiv.classList.add('hidden');
+                const sizeValue = settings.cardSizeClass.replace('size-', '');
+                cardSizeSelect.value = sizeValue;
+            }
+             // Apply the loaded size immediately
+             applySizeUpdate();
+        }
+
+        // --- Printing ---
+        function printBatch() {
+            // Optional: Apply print-specific styles or adjustments here if needed
+            window.print();
+        }
+
+        // --- Data Management (Import/Export) ---
+        function exportData() {
+            if (peopleData.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+            const dataStr = JSON.stringify(peopleData, null, 2); // Pretty print JSON
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            link.download = `id_card_data_${timestamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url); // Clean up
+        }
+
+        function importData() {
+            const file = importFileInput.files[0];
+            if (!file) {
+                alert("Please select a JSON file to import.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    if (Array.isArray(importedData)) {
+                        // Basic validation: check if items look like person objects (optional)
+                        const isValid = importedData.every(item => typeof item === 'object' && item !== null && 'name' in item && 'idNumber' in item);
+                        if (isValid) {
+                            if (confirm(`Importing ${importedData.length} entries. This will replace current data. Continue?`)) {
+                                peopleData = importedData;
+                                updateBatchView();
+                                updateIdNumberPlaceholder(); // Recalculate next ID
+                                alert("Data imported successfully!");
+                                // Optionally switch to batch view tab
+                                openTab({ currentTarget: document.querySelector('.tab-button[onclick*="batchTab"]') }, 'batchTab');
+                            }
+                        } else {
+                             alert("Import failed: Invalid data format in the JSON file.");
+                        }
+                    } else {
+                        alert("Import failed: JSON file does not contain a valid array.");
+                    }
+                } catch (e) {
+                    alert(`Import failed: Error parsing JSON file. ${e.message}`);
+                    console.error("JSON Parsing Error:", e);
+                } finally {
+                     importFileInput.value = ''; // Reset file input
+                }
+            };
+            reader.onerror = function() {
+                 alert("Error reading the file.");
+                 importFileInput.value = ''; // Reset file input
+            };
+            reader.readAsText(file);
+        }
+
+         function clearAllData() {
+             if (confirm("Are you sure you want to delete ALL ID card entries? This cannot be undone.")) {
+                 peopleData = [];
+                 updateBatchView();
+                 updateIdNumberPlaceholder(); // Reset auto ID counter
+                 alert("All entries cleared.");
+             }
+         }
+
+    </script>
+
+</body>
+</html>
