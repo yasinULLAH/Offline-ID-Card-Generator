@@ -900,4 +900,229 @@
         
         // Clear all entries
         function clearAllEntries() {
-            if
+            if (confirm('Are you sure you want to clear all entries? This cannot be undone.')) {
+                entries = [];
+                saveEntriesToLocalStorage();
+                updateEntryList();
+                document.getElementById('print-preview').innerHTML = '';
+            }
+        }
+        
+        // Export entries to JSON file
+        function exportEntries() {
+            if (entries.length === 0) {
+                alert('No entries to export.');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(entries);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'id-cards-data.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+        
+        // Import entries from JSON file
+        function importEntries(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedEntries = JSON.parse(e.target.result);
+                    if (Array.isArray(importedEntries)) {
+                        if (confirm(`Import ${importedEntries.length} entries?`)) {
+                            entries = [...entries, ...importedEntries];
+                            saveEntriesToLocalStorage();
+                            updateEntryList();
+                            alert('Entries imported successfully!');
+                        }
+                    } else {
+                        alert('Invalid file format.');
+                    }
+                } catch (error) {
+                    alert('Error parsing file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        }
+        
+        // Save entries to local storage
+        function saveEntriesToLocalStorage() {
+            localStorage.setItem('idCardEntries', JSON.stringify(entries));
+        }
+        
+        // Load entries from local storage
+        function loadEntriesFromLocalStorage() {
+            const storedEntries = localStorage.getItem('idCardEntries');
+            if (storedEntries) {
+                try {
+                    entries = JSON.parse(storedEntries);
+                } catch (e) {
+                    console.error('Error loading entries:', e);
+                    entries = [];
+                }
+            }
+        }
+        
+        // Save settings
+        function saveSettings() {
+            // Get values from form
+            settings.orgName = document.getElementById('org-name').value || 'Your Organization';
+            settings.orgAddress = document.getElementById('org-address').value || '';
+            settings.footerText = document.getElementById('footer-text').value || 'If found, please return to the address above';
+            settings.cardSize = document.getElementById('card-size').value;
+            settings.customWidth = parseInt(document.getElementById('card-width').value) || 300;
+            settings.customHeight = parseInt(document.getElementById('card-height').value) || 200;
+            settings.primaryColor = document.getElementById('primary-color').value;
+            settings.secondaryColor = document.getElementById('secondary-color').value;
+            
+            // Get logo if changed
+            const logoInput = document.getElementById('org-logo');
+            if (logoInput.files && logoInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    settings.logo = e.target.result;
+                    saveSettingsToLocalStorage();
+                    updateCardPreview();
+                    updateCSSVariables();
+                    alert('Settings saved successfully!');
+                };
+                reader.readAsDataURL(logoInput.files[0]);
+            } else {
+                saveSettingsToLocalStorage();
+                updateCardPreview();
+                updateCSSVariables();
+                alert('Settings saved successfully!');
+            }
+        }
+        
+        // Reset settings to default
+        function resetSettings() {
+            if (confirm('Reset all settings to default?')) {
+                settings = {
+                    orgName: 'Your Organization',
+                    orgAddress: '123 Main St, City, State, ZIP',
+                    footerText: 'If found, please return to the address above',
+                    logo: null,
+                    cardSize: 'badge',
+                    customWidth: 300,
+                    customHeight: 200,
+                    primaryColor: '#3498db',
+                    secondaryColor: '#2c3e50'
+                };
+                
+                // Update form
+                document.getElementById('org-name').value = settings.orgName;
+                document.getElementById('org-address').value = settings.orgAddress;
+                document.getElementById('footer-text').value = settings.footerText;
+                document.getElementById('card-size').value = settings.cardSize;
+                document.getElementById('card-width').value = settings.customWidth;
+                document.getElementById('card-height').value = settings.customHeight;
+                document.getElementById('primary-color').value = settings.primaryColor;
+                document.getElementById('secondary-color').value = settings.secondaryColor;
+                document.getElementById('logo-preview').src = '';
+                
+                // Update custom size container visibility
+                const customSizeContainer = document.getElementById('custom-size-container');
+                if (settings.cardSize === 'custom') {
+                    customSizeContainer.classList.remove('hidden');
+                } else {
+                    customSizeContainer.classList.add('hidden');
+                }
+                
+                saveSettingsToLocalStorage();
+                updateCardPreview();
+                updateCSSVariables();
+            }
+        }
+        
+        // Save settings to local storage
+        function saveSettingsToLocalStorage() {
+            localStorage.setItem('idCardSettings', JSON.stringify(settings));
+        }
+        
+        // Load settings from local storage
+        function loadSettingsFromLocalStorage() {
+            const storedSettings = localStorage.getItem('idCardSettings');
+            if (storedSettings) {
+                try {
+                    const parsedSettings = JSON.parse(storedSettings);
+                    settings = {...settings, ...parsedSettings};
+                    
+                    // Update form
+                    document.getElementById('org-name').value = settings.orgName;
+                    document.getElementById('org-address').value = settings.orgAddress;
+                    document.getElementById('footer-text').value = settings.footerText;
+                    document.getElementById('card-size').value = settings.cardSize;
+                    document.getElementById('card-width').value = settings.customWidth;
+                    document.getElementById('card-height').value = settings.customHeight;
+                    document.getElementById('primary-color').value = settings.primaryColor;
+                    document.getElementById('secondary-color').value = settings.secondaryColor;
+                    
+                    if (settings.logo) {
+                        document.getElementById('logo-preview').src = settings.logo;
+                    }
+                    
+                    // Update custom size container visibility
+                    const customSizeContainer = document.getElementById('custom-size-container');
+                    if (settings.cardSize === 'custom') {
+                        customSizeContainer.classList.remove('hidden');
+                    } else {
+                        customSizeContainer.classList.add('hidden');
+                    }
+                    
+                    updateCSSVariables();
+                } catch (e) {
+                    console.error('Error loading settings:', e);
+                }
+            }
+        }
+        
+        // Update CSS variables based on settings
+        function updateCSSVariables() {
+            document.documentElement.style.setProperty('--primary-color', settings.primaryColor);
+            document.documentElement.style.setProperty('--secondary-color', settings.secondaryColor);
+        }
+        
+        // Update card preview based on settings
+        function updateCardPreview() {
+            if (document.getElementById('card-preview').children.length > 0) {
+                previewCard();
+            }
+        }
+        
+        // Regenerate all cards for print view
+        function regenerateCards() {
+            const printPreview = document.getElementById('print-preview');
+            printPreview.innerHTML = '';
+            
+            if (entries.length === 0) {
+                printPreview.innerHTML = '<p>No entries to display. Add some entries first.</p>';
+                return;
+            }
+            
+            entries.forEach(entry => {
+                const card = createCardElement(entry);
+                printPreview.appendChild(card);
+            });
+        }
+        
+        // Print cards
+        function printCards() {
+            if (entries.length === 0) {
+                alert('No entries to print. Add some entries first.');
+                return;
+            }
+            
+            window.print();
+        }
+    </script>
+</body>
+</html>
